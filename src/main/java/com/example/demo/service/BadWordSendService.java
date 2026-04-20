@@ -1,0 +1,47 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.CheckResult;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientExtensionsKt;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class BadWordSendService {
+
+    private final BadWordValidService badWordValidService;
+
+    /**
+     * 사용자가 입력한 문장의 비속어 여부를 판별하는 핵심 메소드
+     *
+     * @param userInput 사용자가 입력한 문장
+     * @return 비속어 여부, 유사도, 매칭된 단어 등을 포함한 CheckResult 객체
+     */
+    public CheckResult checkBadWord(String userInput) {
+        // 1. [유사도 검색] VectorStore를 사용하여 입력된 문장과 가장 유사한 데이터를 검색합니다.
+        List<Document> results = badWordValidService.selectVector(userInput);
+
+        // 2. [검색 결과 확인] 만약 DB에 비교할 데이터가 전혀 없다면 LLM에게 직접 물어봅니다.
+        if (results.isEmpty()) {
+            return badWordValidService.askLLM(userInput);
+        }
+
+        CheckResult checkResult = badWordValidService.checkResult(results);
+        if (checkResult.isBad()) {
+            // 6. [결과 객체 반환] 최종 판별 결과와 관련 정보를 담은 DTO(CheckResult)를 생성하여 반환합니다.
+            return checkResult;
+        } else {
+            // 유사도가 낮으면 LLM 판별을 한 번 더 수행합니다.
+            return badWordValidService.askLLM(userInput);
+        }
+    }
+
+}
