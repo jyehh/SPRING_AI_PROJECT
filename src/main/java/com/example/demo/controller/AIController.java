@@ -79,14 +79,14 @@ public class AIController {
 
   @PostMapping("/check/v4")
   @ResponseBody
-  public ResponseEntity<Map<String,String>> checkWordv4(@RequestBody Map<String, String> request){
+  public ResponseEntity<CheckResult> checkWordv4(@RequestBody Map<String, String> request){
     String sentence = request.get("sentence");
 
     if (sentence == null || sentence.trim().isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
 
-    Map<String,String> result = checkWordService.isChecked(sentence);
+    CheckResult result = checkWordService.isChecked(sentence);
 
     return ResponseEntity.ok(result);
   }

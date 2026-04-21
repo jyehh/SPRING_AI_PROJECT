@@ -43,6 +43,12 @@ public class PendingBadWord {
     @Column(name = "update_dtm")
     private LocalDateTime updateDtm;
 
+
+    @Column(name = "check_type")
+    private String checkType;
+
+    private String response;
+
     @PrePersist
     protected void onCreate() {
         this.insertDtm = LocalDateTime.now();

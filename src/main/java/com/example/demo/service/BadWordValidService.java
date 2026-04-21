@@ -46,7 +46,7 @@ public class BadWordValidService {
 
         // 3. 기준치(Threshold) 설정 및 최종 판별
         // 유사도가 0.70보다 높고, 타입이 IMMORAL_NONE이 아닌 경우에만 비속어로 판단합니다.
-        boolean isBad = similarity > 0.70 && !sentenceTypes.contains("IMMORAL_NONE");
+        boolean isBad = similarity > 0.75 && !sentenceTypes.contains("IMMORAL_NONE");
 
         log.info("판별 결과 - 가장 유사한 문장: {}, 유사도: {}, 타입: {}, 판별: {}",
                  matchedWord, similarity, sentenceTypes, isBad ? "비속어" : "정상");

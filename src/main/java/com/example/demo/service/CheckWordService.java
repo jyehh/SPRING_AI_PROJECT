@@ -1,9 +1,12 @@
 package com.example.demo.service;
 
 import com.example.demo.domain.BadWord;
+import com.example.demo.dto.CheckResult;
 import com.example.demo.repository.BadWordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.annotations.Check;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -22,8 +25,9 @@ public class CheckWordService {
 
     private final VectorStore vectorStore;
     private final BadWordRepository badWordRepository;
+    private final BadWordPendingService badWordPendingService;
 
-    public Map<String, String> isChecked(String input) {
+    public CheckResult isChecked(String input) {
         // 1. 문장 분리 (공백 기준)
         String[] words = input.split("\\s+");
         log.info("입력 문장 분석 :: {}개의 단어 감지", words.length);
@@ -33,31 +37,41 @@ public class CheckWordService {
         Pattern pattern = Pattern.compile(regex);
 
         boolean isBad = false;
-        String detectedWord = "N/A";
+        String detectedWord = "NONE";
+        String sentenceTypes = "IMMORAL_NONE";
+        double similarity = 0.0;
         StringBuilder normalizedSentence = new StringBuilder();
 
         for (String word : words) {
             // [Step 1] 단어 정제 (특수문자/숫자 제거)
             String cleaned = word.replaceAll("[^가-힣a-zA-Z]", "");
+            log.info("clean: {}",cleaned);
             if (cleaned.isEmpty()) continue;
 
             // [Step 2] 단어 정규화 (반복 문자 축소)
             String normalized = cleaned.replaceAll("(.)\\1+", "$1");
             normalizedSentence.append(normalized).append(" ");
+            log.info("normalized: {}",normalized);
 
-            // [Step 3: 방어선 1] 정규식 매칭 체크 -> DB(JPA) 확인
+            // [Step 3: 정규식 매칭 체크] -> 매칭 시 즉시 break
             if (pattern.matcher(normalized).find()) {
-                log.info("정규식 매칭 감지: [{}], DB 추가 확인 진행", normalized);
-                Optional<BadWord> badWord = badWordRepository.findByWord(normalized);
-                if (badWord.isPresent()) {
-                    isBad = true;
-                    detectedWord = word;
-                    log.warn("정규식 및 DB(JPA) 매칭 완료: word=[{}], normalized=[{}]", word, normalized);
-                    break;
-                }
+                isBad = true;
+                detectedWord = word;
+                log.warn("정규식 매칭 감지: word=[{}], normalized=[{}]", word, normalized);
+                break;
             }
 
-            // [Step 4: 방어선 2] 벡터 유사도 검색 (DB 조회)
+            // [Step 4: RDB(JPA) 조회] -> 정규식에 안 걸린 경우만 실행
+            Optional<BadWord> badWord = badWordRepository.findByWord(normalized);
+            if (badWord.isPresent()) {
+                isBad = true;
+                detectedWord = word;
+                log.warn("DB(JPA) 매칭 감지: word=[{}], normalized=[{}]", word, normalized);
+                break;
+            }
+
+            // [Step 5: ] 벡터 유사도 검색 (DB 조회)
+            // file type이 word 인것만 조회
             List<Document> results = vectorStore.similaritySearch(
                     SearchRequest.builder()
                             .query(normalized)
@@ -65,30 +79,38 @@ public class CheckWordService {
                             .filterExpression("file == 'word'")
                             .build()
             );
+            log.info("results: {}",results);
 
+            // 벡터 유사도 검색 이후 결과가 empty가 아닌 경우에 최종적으로 유사도 체크
             if (!results.isEmpty()) {
                 Document topResult = results.get(0);
-                double similarity = (topResult.getScore() != null) ? topResult.getScore() : 0.0;
+                similarity = (topResult.getScore() != null) ? topResult.getScore() : 0.0;
                 Object typesObj = topResult.getMetadata().getOrDefault("types", "N/A");
-                String sentenceTypes = String.valueOf(typesObj).replaceAll("[\\[\\]\"]", "");
-
+                sentenceTypes = String.valueOf(typesObj).replaceAll("[\\[\\]\"]", "");
+                log.info("123");
                 // 단어 단위 검색이므로 유사도 기준을 엄격하게(0.85) 설정
                 if (similarity > 0.85 && !sentenceTypes.contains("IMMORAL_NONE")) {
                     isBad = true;
                     detectedWord = word;
                     log.warn("벡터 DB 매칭 감지: word=[{}], similarity={}", word, similarity);
+                    log.info("456");
                     break;
                 }
             }
         }
 
-        Map<String, String> result = new HashMap<>();
-        result.put("origin", input);
-        result.put("isBad", String.valueOf(isBad));
-        result.put("detectedWord", detectedWord);
-        result.put("normalizedSentence", normalizedSentence.toString().trim());
+        //detectedWord가 NONE이면 유사도가 낮거나, 비속어가 아님을 의미
+        if("NONE".equals(detectedWord)) {
+         return badWordPendingService.checkBadWord(normalizedSentence.toString().trim());
+        }
 
-        return result;
+        return new CheckResult(
+                isBad,
+                "비속어가 감지되었습니다.",
+                sentenceTypes,
+                similarity,
+                detectedWord
+        );
     }
 
 }
