@@ -7,6 +7,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +20,9 @@ public class BadWordValidService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+
+    @Value("classpath:/prompts/bad-word-filter.st")
+    private Resource systemPromptResource;
 
     public List<Document> selectVector(String userInput) {
         return vectorStore.similaritySearch(
@@ -56,17 +61,8 @@ public class BadWordValidService {
     }
 
     public CheckResult askLLM(String userInput) {
-        String systemPrompt = """
-                    당신은 온라인 커뮤니티의 비속어 필터링 전문가입니다.
-                    입력된 문장이 비속어, 욕설, 타인에 대한 비방, 혐오 표현을 포함하고 있는지 판단하세요.
-                    답변은 오직 'true' (비속어임) 또는 'false' (비속어 아님) 중 하나로만 대답하고,
-                    카테고리와 함께 true (혐오 표현) , false () 와 같이 대답하세요.
-                    문맥상 일상적인 대화나 감정 표현(예: 배고파, 졸려)은 false로 판단하세요.
-                    결과는
-                    """;
-
         String response = chatClient.prompt()
-                .system(systemPrompt)
+                .system(systemPromptResource)
                 .user(userInput)
                 .call()
                 .content();
