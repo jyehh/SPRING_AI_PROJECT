@@ -24,7 +24,8 @@ public class AIController {
   private BadWordSelectService badWordService;
   @Autowired
   private BadWordSendService badWordSendService;
-
+  @Autowired
+  private BadWordPendingService badWordPendingService;
 
   @GetMapping("/healthcheck")
   public ResponseEntity<String> healthcheck() {
@@ -86,7 +87,7 @@ public class AIController {
       return ResponseEntity.badRequest().build();
     }
 
-    CheckResult result = checkWordService.isChecked(sentence);
+    CheckResult result = badWordPendingService.isChecked(sentence);
 
     return ResponseEntity.ok(result);
   }

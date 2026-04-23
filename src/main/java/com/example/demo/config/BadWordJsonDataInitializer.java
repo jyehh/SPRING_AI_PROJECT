@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * 문장 기반의 고정 ID를 생성하여 중복 저장을 방지(Upsert)합니다.
  */
 @Slf4j
-@Component
+//@Component
 @RequiredArgsConstructor
 public class BadWordJsonDataInitializer {
 
@@ -55,33 +55,50 @@ public class BadWordJsonDataInitializer {
 
             log.info("총 {}건의 JSON 문장을 로드했습니다. VectorStore 입력을 시작합니다.", totalSize);
 
-            // 2. 배치(Batch) 처리 설정: 효율적인 삽입을 위해 100건 단위로 처리
-            int batchSize = 100;
+            // 2. 배치(Batch) 처리 설정: 속도 최적화를 위해 500건 단위로 상향
+            int batchSize = 500;
+            int startIndex = 38192; // 36227번째부터 시작 (0-based index)
 
-            for (int i = 0; i < totalSize; i += batchSize) {
+            if (startIndex >= totalSize) {
+                log.warn("시작 인덱스({})가 전체 데이터 크기({})보다 큽니다.", startIndex + 1, totalSize);
+                return;
+            }
+
+            for (int i = startIndex; i < totalSize; i += batchSize) {
+                long startTime = System.currentTimeMillis();
+
                 int endIndex = Math.min(i + batchSize, totalSize);
                 List<BadJsonData> subList = allData.subList(i, endIndex);
-                
-                // 3. Document 객체 리스트 생성 (중복 방지를 위한 고정 ID 생성 포함)
-                List<Document> documents = subList.stream().map(data -> {
+
+                // 3. Document 객체 리스트 생성 (parallelStream을 사용하여 CPU 멀티코어 활용)
+                List<Document> documents = subList.parallelStream().map(data -> {
                     String content = data.sentence().trim();
                     // 문장 내용을 기반으로 고정된 UUID 생성 (중복 방지 핵심)
-                    String deterministicId = UUID.nameUUIDFromBytes(content.getBytes(StandardCharsets.UTF_8)).toString();
-                    
-                    // Spring AI Document는 메타데이터에 null 값을 허용하지 않으므로, null인 필드는 제외합니다.
-                    Map<String, Object> filteredMetadata = data.metadata().entrySet().stream()
-                            .filter(entry -> entry.getValue() != null)
-                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    String deterministicId = java.util.UUID.nameUUIDFromBytes(content.getBytes(StandardCharsets.UTF_8)).toString();
+
+                    // Spring AI Document는 메타데이터에 null 값을 허용하지 않으므로 필터링
+                    java.util.Map<String, Object> filteredMetadata = new java.util.HashMap<>();
+                    data.metadata().forEach((key, value) -> {
+                        if (value != null) {
+                            filteredMetadata.put(key, value);
+                        }
+                    });
 
                     return new Document(deterministicId, content, filteredMetadata);
                 }).toList();
 
-                // 4. VectorStore에 저장 (ID가 같으면 자동으로 ON CONFLICT / Upsert 처리됨)
+                long convTime = System.currentTimeMillis();
+
+                // 4. VectorStore에 저장 (임베딩 생성 및 DB 저장)
                 vectorStore.add(documents);
 
-                // 실시간 진행률 로그 출력
+                long saveTime = System.currentTimeMillis();
+
+                // 실시간 진행률 및 소요 시간 로그 출력
                 double progress = ((double) endIndex / totalSize) * 100;
-                log.info("[JSON 진행 상황] {} / {} 건 완료 ({}) / 시간 : [{}]", endIndex, totalSize, String.format("%.2f%%", progress), LocalDateTime.now());
+                log.info("[JSON 진행] {}/{}건 ({}) | 변환: {}ms, 저장: {}ms | 시각: {}",
+                         endIndex, totalSize, String.format("%.2f%%", progress),
+                         (convTime - startTime), (saveTime - convTime), LocalDateTime.now());
             }
 
             log.info("==== [JSON 데이터 초기화] 모든 작업이 완료되었습니다! ====");

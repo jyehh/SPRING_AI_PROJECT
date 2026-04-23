@@ -11,7 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -24,39 +25,94 @@ public class BadWordValidService {
     @Value("classpath:/prompts/bad-word-filter.st")
     private Resource systemPromptResource;
 
+    /**
+     * 다중 검증을 위해 Top 5개의 유사 데이터를 검색합니다.
+     */
     public List<Document> selectVector(String userInput) {
         return vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(userInput)
-                        .topK(1)
+                        .topK(5) // 5개로 변경
                         .build()
         );
     }
 
-    public CheckResult checkResult(List<Document> results){
-        Document topResult = results.get(0);
-        // VectorStore에서 score는 보통 1 - 코사인 거리 (유사도)를 반환합니다.
-        double similarity = topResult.getScore();
-        String matchedWord = topResult.getText();
+    /**
+     * 5개의 검색 결과를 분석하여 가장 빈번한 타입을 찾고 평균 유사도를 계산합니다.
+     */
+    public CheckResult checkResult(List<Document> results) {
+        if (results == null || results.isEmpty()) {
+            return new CheckResult(false, "검색 결과가 없습니다.", "N/A", 0.0, null);
+        }
 
-        // 메타데이터에서 'types' 정보를 추출합니다.
-        // List 형태로 저장된 경우를 대비해 문자열로 변환 후 대괄호 등을 제거합니다.
-        Object typesObj = topResult.getMetadata().getOrDefault("types", "N/A");
-        String sentenceTypes = String.valueOf(typesObj).replaceAll("[\\[\\]\"]", "");
+        // 1. 데이터를 가공하여 리스트로 저장 (유사도 순서 유지)
+        record ResultItem(double score, String text, String type) {}
+        List<ResultItem> items = results.stream().map(doc -> {
+            double score = doc.getScore();
+            String text = doc.getText();
+            Object typesObj = doc.getMetadata().getOrDefault("types", "N/A");
+            String type = String.valueOf(typesObj).replaceAll("[\\[\\]\"]", "");
+            return new ResultItem(score, text, type);
+        }).toList();
 
-        // 3. 기준치(Threshold) 설정 및 최종 판별
-        // 유사도가 0.70보다 높고, 타입이 IMMORAL_NONE이 아닌 경우에만 비속어로 판단합니다.
-        boolean isBad = similarity > 0.75 && !sentenceTypes.contains("IMMORAL_NONE");
+        // 2. 타입별 빈도수 계산
+        Map<String, Long> typeCounts = items.stream()
+                .collect(Collectors.groupingBy(ResultItem::type, Collectors.counting()));
 
-        log.info("판별 결과 - 가장 유사한 문장: {}, 유사도: {}, 타입: {}, 판별: {}",
-                 matchedWord, similarity, sentenceTypes, isBad ? "비속어" : "정상");
+        // 3. 가장 많이 중복된 타입 및 평균 유사도 결정
+        long maxCount = Collections.max(typeCounts.values());
+        
+        String finalType;
+        double finalSimilarity;
+        String finalMatchedWord;
+
+        if (maxCount > 1) {
+            // 중복된 타입이 있는 경우: 가장 빈도가 높은 타입 선정
+            // (동률일 경우 유사도가 높은 순서대로 먼저 발견된 타입을 선택)
+            finalType = items.stream()
+                    .map(ResultItem::type)
+                    .filter(type -> typeCounts.get(type) == maxCount)
+                    .findFirst()
+                    .orElse("N/A");
+
+            // [수정] 해당 타입에 속하는 결과들 중 가장 높은 유사도 선택 (리스트가 이미 정렬되어 있으므로 첫 번째 값이 최대값)
+            finalSimilarity = items.stream()
+                    .filter(i -> i.type().equals(finalType))
+                    .findFirst()
+                    .map(ResultItem::score)
+                    .orElse(0.0);
+
+            // 해당 타입 중 가장 유사도가 높은 단어 선택
+            finalMatchedWord = items.stream()
+                    .filter(i -> i.type().equals(finalType))
+                    .findFirst()
+                    .map(ResultItem::text)
+                    .orElse(null);
+        } else {
+            // 중복이 하나도 없는 경우: 가장 유사도가 높은 첫 번째 데이터 사용
+            ResultItem top = items.get(0);
+            finalType = top.type();
+            finalSimilarity = top.score();
+            finalMatchedWord = top.text();
+        }
+
+        // 4. 최종 비속어 여부 판별 (기준치 0.80 및 IMMORAL_NONE 제외 로직 유지)
+        boolean isBad = finalSimilarity > 0.80 && !finalType.contains("IMMORAL_NONE");
+
+        // 5. 전체 데이터 상세 로그 생성
+        String allItemsLog = items.stream()
+                .map(i -> String.format("[%s (%.4f, %s)]", i.text(), i.score(), i.type()))
+                .collect(Collectors.joining(", "));
+
+        log.info("다중 검증 결과 - 선정타입: {}(빈도:{}), 최대유사도: {}, 대표단어: {}, 판별: {}\n전체 데이터: {}",
+                 finalType, maxCount, String.format("%.4f", finalSimilarity), finalMatchedWord, isBad ? "비속어" : "정상", allItemsLog);
 
         return new CheckResult(
                 isBad,
-                isBad ? "비속어가 감지되었습니다." : "안전한 문장입니다.",
-                sentenceTypes,
-                similarity,
-                matchedWord
+                isBad ? "비속어가 감지되었습니다. (다중 검증)" : "안전한 문장입니다.",
+                finalType,
+                finalSimilarity,
+                finalMatchedWord
         );
     }
 
@@ -69,7 +125,8 @@ public class BadWordValidService {
 
         log.info("LLM 판별 요청: [{}] -> 결과: {}", userInput, response);
 
-        assert response != null;
+        if (response == null) return new CheckResult(false, "LLM 응답 없음", "N/A", 0.0, null);
+        
         boolean isBad = response.toLowerCase().contains("true");
         return new CheckResult(
                 isBad,
