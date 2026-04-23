@@ -4,6 +4,7 @@ import com.example.demo.domain.BadWord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,5 +16,5 @@ public interface BadWordRepository extends JpaRepository<BadWord, Long> {
 //    List<String> findAllWords();
     // 조건 없이 전체 단어 리스트만 SELECT
     @Query("SELECT b.word FROM BadWord b")
-    List<String> findAllWords();
+    HashSet<String> findAllWords();
 }

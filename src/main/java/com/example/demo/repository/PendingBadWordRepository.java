@@ -12,15 +12,14 @@ public interface PendingBadWordRepository extends JpaRepository<PendingBadWord, 
     @Modifying
     @Transactional
     @Query(value = "INSERT INTO pending_bad_word " +
-            "(pending_word, bad_word, similarity, insert_id, update_id,check_type) " +
+            "(pending_word, bad_word, similarity, insert_id, update_id, check_type) " +
             "VALUES (:pendingWord, :badWord, :similarity, :userId, :userId, :checkType) " +
             "ON CONFLICT (pending_word) " +
             "DO UPDATE SET " +
             "update_count = pending_bad_word.update_count + 1, " +
             "similarity = EXCLUDED.similarity, " +
             "update_dtm = CURRENT_TIMESTAMP, " +
-            "update_id = EXCLUDED.update_id",
-            nativeQuery = true)
+            "update_id = EXCLUDED.update_id", nativeQuery = true)
     void upsertPendingWord(@Param("pendingWord") String pendingWord,
                            @Param("badWord") String badWord,
                            @Param("similarity") Double similarity,
@@ -28,14 +27,11 @@ public interface PendingBadWordRepository extends JpaRepository<PendingBadWord, 
                            @Param("checkType") String checkType);
 
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query(value = "UPDATE pending_bad_word " +
-            "SET response = :response " +
-            "WHERE pending_word = :pendingWord",
-            nativeQuery = true)
-    void updatePendingWord(@Param("response") String response,
-                           @Param("pendingWord") String pendingWord);
+    @Query("UPDATE PendingBadWord p SET p.response = :response WHERE p.pendingWord = :pendingWord")
+    void updatePendingWord(@Param("response") String response, @Param("pendingWord") String pendingWord);
+
 
 
 }

@@ -25,13 +25,13 @@ public class BadWordSendService {
      * @param userInput 사용자가 입력한 문장
      * @return 비속어 여부, 유사도, 매칭된 단어 등을 포함한 CheckResult 객체
      */
-    public CheckResult checkBadWord(String userInput) {
+    public CheckResult checkBadWordV3(String userInput) {
         // 1. [유사도 검색] VectorStore를 사용하여 입력된 문장과 가장 유사한 데이터를 검색합니다.
         List<Document> results = badWordValidService.selectVector(userInput);
 
         // 2. [검색 결과 확인] 만약 DB에 비교할 데이터가 전혀 없다면 LLM에게 직접 물어봅니다.
         if (results.isEmpty()) {
-            return badWordValidService.askLLM(userInput);
+            return badWordValidService.askLLM(userInput,"조회된 데이터가 없습니다.");
         }
 
         CheckResult checkResult = badWordValidService.checkResult(results);
@@ -40,7 +40,7 @@ public class BadWordSendService {
             return checkResult;
         } else {
             // 유사도가 낮으면 LLM 판별을 한 번 더 수행합니다.
-            return badWordValidService.askLLM(userInput);
+            return badWordValidService.askLLM(userInput,checkResult.allItemsLog());
         }
     }
 

@@ -17,8 +17,6 @@ import java.util.Map;
 public class AIController {
 
   @Autowired
-  private CheckWordService checkWordService;
-  @Autowired
   private BadWordSaveService badWordSaveService;
   @Autowired
   private BadWordSelectService badWordService;
@@ -44,9 +42,9 @@ public class AIController {
 
     try {
       badWordSaveService.saveBadWord(sentence);
-      return ResponseEntity.ok(new CheckResult(false, "성공적으로 등록되었습니다.", "N/A", 0.0, null));
+      return ResponseEntity.ok(new CheckResult(false, "성공적으로 등록되었습니다.", "N/A", 0.0, null,null));
     } catch (Exception e) {
-      return ResponseEntity.internalServerError().body(new CheckResult(true, "에러 발생: " + e.getMessage(), "ERROR", 0.0, null));
+      return ResponseEntity.internalServerError().body(new CheckResult(true, "에러 발생: " + e.getMessage(), "ERROR", 0.0, null,null));
     }
   }
 
@@ -59,7 +57,7 @@ public class AIController {
         return ResponseEntity.badRequest().build();
       }
 
-      CheckResult result = badWordService.checkBadWord(sentence);
+      CheckResult result = badWordService.checkBadWordV2(sentence);
       return ResponseEntity.ok(result);
     }
 
@@ -72,7 +70,7 @@ public class AIController {
       return ResponseEntity.badRequest().build();
     }
 
-    CheckResult result = badWordSendService.checkBadWord(sentence);
+    CheckResult result = badWordSendService.checkBadWordV3(sentence);
 
     return ResponseEntity.ok(result);
   }
@@ -92,16 +90,4 @@ public class AIController {
     return ResponseEntity.ok(result);
   }
 
-//
-//  @PostMapping(
-//          value = "/advisor-moderation",
-//          consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
-//          produces = MediaType.TEXT_PLAIN_VALUE
-//  )
-//  public String moderationCheckAdvisor(@RequestParam("question") String question) {
-//    log.info("moder 인입확인");
-//    String response = aiService6.moderationCheckAdvisor(question);
-//    log.info("moder 종료확인");
-//    return response;
-//  }
 }

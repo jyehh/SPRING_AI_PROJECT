@@ -5,5 +5,6 @@ public record CheckResult(
         String message,
         String sentence_types,
         double similarity,
-        String matchedWord
+        String matchedWord,
+        Object allItemsLog
 ) {}
