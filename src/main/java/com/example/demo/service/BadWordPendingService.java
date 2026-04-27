@@ -7,11 +7,7 @@ import com.example.demo.repository.PendingBadWordRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
@@ -27,6 +23,7 @@ public class BadWordPendingService {
     private final BadWordValidService badWordValidService;
     private final PendingBadWordRepository pendingBadWordRepository;
     private final BadWordRepository badWordRepository;
+    private final BadWordSaveService badWordSaveService;
     
     // Jaro-Winkler 유사도 객체
     private static final JaroWinklerSimilarity jw = new JaroWinklerSimilarity();
@@ -38,10 +35,10 @@ public class BadWordPendingService {
     private static final Pattern BAD_WORD_PATTERN = Pattern.compile(
             "[시씨씪슈쓔쉬쉽쒸쓉](?:[0-9]*|[0-9]+ *)[바발벌빠빡빨뻘파팔펄]|[섊좆좇졷좄좃좉졽썅춍봊]|[ㅈ조][0-9]*까|ㅅㅣㅂㅏㄹ?|ㅂ[0-9]*ㅅ|[ㅄᄲᇪᄺᄡᄣᄦᇠ]|[ㅅㅆᄴ][0-9]*[ㄲㅅㅆᄴㅂ]|[존좉좇][0-9 ]*나|[자보][0-9]+지|보빨|[봊봋봇봈볻봁봍] *[빨이]|[후훚훐훛훋훗훘훟훝훑][장앙]|[엠앰]창|애[미비]|애자|[가-탏탑-힣]색기|(?:[샊샛세쉐쉑쉨쉒객갞갟객갞갟갯갰갴겍겎겏겤곅곆곇곗곘곜걕걖걗걧걨걬] *[끼키퀴])|새 *[키퀴]|[병븅][0-9]*[신딱딲]|미친[가-닥-힣]|[믿밑]힌|[염옘][0-9]*병|[샊샛샜샠섹섺셋셌셐셱솃솄솈섁섂섓섔섘]기|[섹섺섻섹쎆쎇쎽쎾쎿섁섂섃썍썎썏][스쓰]|[지야][0-9]*랄|니[애에]미|갈[0-9]*보[^가-힣]|[뻐뻑뻒뻙뻨][0-9]*[뀨큐킹낑]|꼬[0-9]*추|곧[0-9]*휴|[가-힣]슬아치|자[0-9]*박꼼|빨통|[사싸](?:이코|가지|[0-9]*까시)|육[0-9]*시[랄럴]|육[0-9]*실[알얼할헐]|즐[^가-힣]|찌[0-9]*(?:질이|랭이)|찐[0-9]*따|찐[0-9]*찌버거|창[녀놈]|[가-힣]{2,}충[^가-힣]|[가-힣]{2,}츙|부녀자|화냥년|환[양향]년|호[0-9]*[구모]|조[선센][징]|조센|[쪼쪽쪾](?:[발빨]이|[바빠]리)|盧|무현|찌끄[레래]기|(?:하악){2,}|하[앍앜]|[낭당랑앙항남담랑앙함][ ]?[가-힣]+[띠찌]|느[금급]마|文전|이성계|(?<=[^\n])[家哥]|속냐|[tT]l[qQ]kf|Wls|[ㅂ]신|[ㅅ]발|[ㅈ]밥",
             Pattern.CASE_INSENSITIVE
-    );
-    private final PgVectorStore vectorStore;
+            );
 
-    // 비속어 목록을 담아둘 메모리 캐시
+            // 비속어 목록을 담아둘 메모리 캐시
+
     // 데이터가 많아지면 아호-코라식 으로 수정 필요
     private HashSet<String> badWordsList;
 
@@ -54,20 +51,21 @@ public class BadWordPendingService {
     public CheckResult checkBadWordV4(String input) {
         HashSet<String> badWordList = badWordsList;
         // [Step 1] 문장 전체 정규식 검사 (숫자/공백 포함 욕설 탐지)
-        // 정규식 자체가 띄어쓰기와 숫자를 대응하도록 되어 있으므로 원본 문장에 먼저 적용합니다.
-        log.info("입력문장:{}",input);
+        log.info("입력문장: {}", input);
 
-        //NFC 정규화를 제일 먼저 진행
+        // NFC 정규화
         String nfcString = Normalizer.normalize(input, Normalizer.Form.NFC);
-        log.info("nfc 정규화 작업 :{}",nfcString);
-        // 숫자, 특수문자, 공백,이모지 제거
-        String cleaneInput = nfcString.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]", "");
-        log.info("특수문자,공백,이모지 제거 작업 :{}",cleaneInput);
-        // 반복되는 문자열 제거
-        String normalized = cleaneInput.replaceAll("(.)\\1+", "$1");
-        log.info("반복되는 문자열 제거 작업 :{}",normalized);
+        log.info("NFC 정규화 완료: {}", nfcString);
+        
+        // 특수문자, 공백, 이모지 제거
+        String cleanedInput = nfcString.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]", "");
+        log.info("특수문자/공백 제거 완료: {}", cleanedInput);
+        
+        // 반복되는 문자열 축소
+        String normalized = cleanedInput.replaceAll("(.)\\1+", "$1");
+        log.info("반복 문자 축소 완료: {}", normalized);
 
-        // NFC까지 완료된 데이터로 정규화 패턴 매칭
+        // 정규화 패턴 매칭
         var matcher = BAD_WORD_PATTERN.matcher(normalized);
         if (matcher.find()) {
             String detected = matcher.group();
@@ -75,98 +73,74 @@ public class BadWordPendingService {
             return new CheckResult(true, "비속어가 감지되었습니다.", "Regex filter", 1.0, detected, "");
         }
 
-
-        // 원본 문자열을 기준으로 비교
+        // 단어 단위 1:1 매칭 검사
         String[] words = input.split("\\s+");
         for (String word : words) {
-            // 특수문자 제거 후 정규화 (자음/모음 ㄱ-ㅎㅏ-ㅣ 포함)
             String cleaned = word.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z]", "");
             if (cleaned.isEmpty()) continue;
 
-            //반복된 글자를 하나로 줄여주는 정규화
             String normalizedWord = cleaned.replaceAll("(.)\\1+", "$1");
-            if (normalized.isEmpty()) continue;
-
-            for (String badWord : badWordList) {
-                if(normalizedWord.equals(badWord)){
-                    return new CheckResult(true, "비속어가 감지되었습니다.", "1:1 데이터 매핑", 1.0, word, "");
-                }
-
+            if (badWordList.contains(normalizedWord)) {
+                log.warn("DB 1:1 매칭 감지: word=[{}]", normalizedWord);
+                return new CheckResult(true, "비속어가 감지되었습니다.", "1:1 데이터 매핑", 1.0, word, "");
             }
-
         }
 
-        // DB 기반 Fuzzy 매칭 할건데 정규화 다 된 데이터로 전달
-        if (isBadWord(normalized, badWordsList)) {
+        // Fuzzy 매칭 검사
+        if (isBadWord(normalized, badWordList)) {
             log.warn("Fuzzy 매칭 감지: normalized=[{}]", normalized);
             return new CheckResult(true, "비속어가 감지되었습니다.", "Fuzzy filter", 1.0, normalized, "");
         }
 
-        //  AI 기반(Vector/LLM) 검사 수행
-        log.info("전처리 통과. AI 기반 검사 수행");
-        return isChedked(input);
+        // AI 기반(Vector/LLM) 검사 수행
+        log.info("로컬 필터 통과. AI 기반(RAG/LLM) 정밀 검사 수행");
+        return isChecked(input);
     }
+
     /**
-     * 사용자가 입력한 문장의 비속어 여부를 판별하는 핵심 메소드
-     *
-     * @param userInput 사용자가 입력한 문장
-     * @return 비속어 여부, 유사도, 매칭된 단어 등을 포함한 CheckResult 객체
+     * AI 기반(RAG + LLM) 비속어 판별 메소드
      */
-    public CheckResult isChedked(String userInput) {
-        // 1. [유사도 검색] VectorStore를 사용하여 입력된 문장과 가장 유사한 데이터를 검색합니다.
-        log.info("RAG 검증 입력값  : {}",userInput);
+    public CheckResult isChecked(String userInput) {
+        log.info("AI 검증 시작 :: 입력값=[{}]", userInput);
+        
+        // 1. RAG(VectorStore) 유사도 검색
         List<Document> results = badWordValidService.selectVector(userInput);
-
-        log.info("RAG 검증 결과 없음");
-        // 2. [검색 결과 확인] 만약 DB에 비교할 데이터가 전혀 없다면 LLM에게 직접 물어봅니다.
+        
+        // 2. 검색 결과가 없는 경우 LLM 직접 검증
         if (results.isEmpty()) {
-            log.info("LLM검증 시작");
-            return badWordValidService.askLLM(userInput,"조회된 데이터가 없습니다.");
-        }else {
-            log.info("RAG 결과 검증");
-            CheckResult checkResult = badWordValidService.checkResult(results);
-            // 임베딩 결과 비속어라고 판단된 경우
-            if (checkResult.isBad()) {
-                // 6. [결과 객체 반환] 최종 판별 결과와 관련 정보를 담은 DTO(CheckResult)를 생성하여 반환합니다.
-                return checkResult;
-            } else {
-                //임베딩 결과가 비속어가 아님으로 판단된 경우
-                log.info("LLM 판별 수행");
-                //LLM 조회 전 대상 문장 적재
-//                savePendingWord(userInput, checkResult);
-                // 유사도가 낮으면 LLM 판별을 수행
-                CheckResult llmResult = badWordValidService.askLLM(userInput, checkResult.allItemsLog());
-                //LLM조회 후 결과 저장
-//                updatePendingWord(String.valueOf(llmResult.isBad()), userInput);
-
-                // LLM 호출 결과가 true 인 경우에만 vector db에 저장
-                log.info("LLM 판별 결과 비속어 판정 DB에 저장");
-                if(llmResult.isBad()){
-                    saveToVectorDB(userInput);
-                }
-
-                return llmResult;
-            }
-        }
-    }
-
-
-    /**
-     *  LLM호출 후 비속어로 판단 된 경우 임베딩 처리
-     **/
-    public void saveToVectorDB(String userInput) {
-        List<Document> existing = vectorStore.similaritySearch(
-                SearchRequest.builder().query(userInput).topK(1).build()
-        );
-
-        // 유사도가 0.99 이상이면 이미 있는 것으로 간주하고 무시
-        if (!existing.isEmpty() && existing.get(0).getScore() > 0.99) {
-            log.info("중복 데이터 발견, 저장을 건너뜁니다: {}", userInput);
-            return;
+            log.info("RAG 결과 없음 -> LLM 직접 검증 수행");
+            return badWordValidService.askLLM(userInput, "조회된 데이터가 없습니다.");
         }
 
-        Document document = new Document(userInput, Map.of("types", List.of("IMMORAL_BAD")));
-        vectorStore.add(List.of(document));
+        // 3. RAG 결과 분석
+        log.info("RAG 결과 분석 중...");
+        CheckResult checkResult = badWordValidService.checkResult(results);
+
+        // 4. RAG 결과가 비속어인 경우 즉시 반환
+        if (checkResult.isBad()) {
+            log.info("RAG 판별 완료: 비속어 감지");
+            return checkResult;
+        }
+
+        // 5. RAG 결과가 정상이지만, 확실히 하기 위해 LLM 2차 검증 수행
+        log.info("RAG 판별 결과: 정상 -> LLM 정밀 재검증 수행");
+        
+        // 대기 데이터 적재 (사후 모니터링용)
+        savePendingWord(userInput, checkResult);
+        
+        // LLM 호출
+        CheckResult llmResult = badWordValidService.askLLM(userInput, checkResult.allItemsLog());
+        
+        // 대기 데이터 업데이트
+        updatePendingWord(String.valueOf(llmResult.isBad()), userInput);
+
+        // LLM 검증 결과 비속어인 경우 Vector DB에 학습 데이터로 자동 저장
+        if (llmResult.isBad()) {
+            log.info("LLM 재검증 결과: 비속어 확정 -> 자동 학습 데이터(Vector DB) 적재");
+            badWordSaveService.saveBadWord(userInput);
+        }
+
+        return llmResult;
     }
 
 

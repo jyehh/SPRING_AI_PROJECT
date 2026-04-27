@@ -57,7 +57,7 @@ public class BadWordJsonDataInitializer {
 
             // 2. 배치(Batch) 처리 설정: 속도 최적화를 위해 500건 단위로 상향
             int batchSize = 500;
-            int startIndex = 38192; // 36227번째부터 시작 (0-based index)
+            int startIndex = 0; // 36227번째부터 시작 (0-based index)
 
             if (startIndex >= totalSize) {
                 log.warn("시작 인덱스({})가 전체 데이터 크기({})보다 큽니다.", startIndex + 1, totalSize);
