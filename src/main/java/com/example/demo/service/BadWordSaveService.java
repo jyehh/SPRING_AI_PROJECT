@@ -30,8 +30,12 @@ public class BadWordSaveService {
         String deterministicId = UUID.nameUUIDFromBytes(sentence.getBytes(StandardCharsets.UTF_8)).toString();
         log.info("생성된 UUID: {}", deterministicId);
 
-        // 2. VectorStore 저장 (동일 ID인 경우 자동으로 덮어쓰기/무시 처리됨)
+        // 2. VectorStore 저장 (동일 ID인 경우 자동으로 덮어쓰기 처리됨)
+        // Documnet는 Spring AI의 기본 규격
         Document document = new Document(deterministicId, sentence, Map.of("types", List.of("IMMORAL_BAD")));
+        // spring ai 가 지원하는 벡터 데이터베이스 구현체
+        // vectorStore를 사용하면 이후에 db가 변경되더라도 코드를 수정할일이 없음 (이식성)
+        // 임베딩하고 vector db에 저장까지
         vectorStore.add(List.of(document));
 
         log.info("비속어 등록 프로세스 완료");

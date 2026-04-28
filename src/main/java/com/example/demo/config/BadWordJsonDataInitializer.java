@@ -15,10 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -74,10 +71,10 @@ public class BadWordJsonDataInitializer {
                 List<Document> documents = subList.parallelStream().map(data -> {
                     String content = data.sentence().trim();
                     // 문장 내용을 기반으로 고정된 UUID 생성 (중복 방지 핵심)
-                    String deterministicId = java.util.UUID.nameUUIDFromBytes(content.getBytes(StandardCharsets.UTF_8)).toString();
+                    String deterministicId = UUID.nameUUIDFromBytes(content.getBytes(StandardCharsets.UTF_8)).toString();
 
                     // Spring AI Document는 메타데이터에 null 값을 허용하지 않으므로 필터링
-                    java.util.Map<String, Object> filteredMetadata = new java.util.HashMap<>();
+                    Map<String, Object> filteredMetadata = new HashMap<>();
                     data.metadata().forEach((key, value) -> {
                         if (value != null) {
                             filteredMetadata.put(key, value);

@@ -42,7 +42,7 @@ public class AIController {
 
       try {
         badWordSaveService.saveBadWord(sentence);
-        return ResponseEntity.ok(new CheckResult(false, "성공적으로 등록되었습니다.", "N/A", 0.0, null,null));
+        return ResponseEntity.ok(new CheckResult(false, "성공적으로 등록되었습니다.", "IMMORAL_BAD", 1.0, null,null));
       } catch (Exception e) {
         return ResponseEntity.internalServerError().body(new CheckResult(true, "에러 발생: " + e.getMessage(), "ERROR", 0.0, null,null));
       }

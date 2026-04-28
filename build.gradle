@@ -23,28 +23,33 @@ ext {
 }
 
 dependencies {
-
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    // [Web & Core]
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
-    implementation 'com.fasterxml.jackson.core:jackson-databind'
-
+    
+    // [Lombok]
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'io.projectreactor:reactor-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    implementation 'org.springframework.ai:spring-ai-pgvector-store-spring-boot-starter'
+    // [Database & JPA]
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.postgresql:postgresql'
-    implementation 'com.pgvector:pgvector:0.1.5'
-    // Spring AI
-    implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter'
+    runtimeOnly 'org.postgresql:postgresql'
 
-    // Fuzzy matching
+//    // pgvector Java 클라이언트
+//    implementation 'com.pgvector:pgvector:0.1.5'
+
+    // [Spring AI]
+    // Ollama 지원
+    implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter'
+    // PGVector Store 지원
+    implementation 'org.springframework.ai:spring-ai-pgvector-store-spring-boot-starter'
+
+    // [Utilities]
+    // Fuzzy matching (Jaro-Winkler 유사도 계산용)
     implementation 'org.apache.commons:commons-text:1.10.0'
+
+    // [Test]
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 dependencyManagement {
