@@ -1,6 +1,5 @@
 package com.example.demo.service;
 
-import com.example.demo.domain.BadWord;
 import com.example.demo.dto.CheckResult;
 import com.example.demo.repository.BadWordRepository;
 import com.example.demo.repository.PendingBadWordRepository;
@@ -60,47 +59,52 @@ public class BadWordPendingService {
         log.info("비속어 목록 로드 완료: {}건", badWordCacheList.size());
     }
 
+    /**
+     * 문자열을 전처리하고 정규화합니다. (NFC 정규화 + 특수문자 제거 + 반복문자 축소)
+     */
+    private String cleanAndNormalize(String input) {
+        if (input == null || input.trim().isEmpty()) return "";
+        
+        // 1. NFC 정규화 (완성형 한글로 통일)
+        String nfc = Normalizer.normalize(input, Normalizer.Form.NFC);
+        
+        // 2. 특수문자, 공백, 이모지 제거 (한글, 영문, 숫자만 유지)
+        String cleaned = nfc.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]", "");
+        
+        // 3. 반복되는 문자열 축소 (예: "바보보보" -> "바보")
+        return cleaned.replaceAll("(.)\\1+", "$1");
+    }
+
     public CheckResult checkBadWordV4(String input) {
-        // [Step 1] 문장 전체 정규식 검사 (숫자/공백 포함 욕설 탐지)
         log.info("입력문장: {}", input);
 
-        // NFC 정규화
-        String nfcString = Normalizer.normalize(input, Normalizer.Form.NFC);
-        log.info("NFC 정규화 완료: {}", nfcString);
-        
-        // 특수문자, 공백, 이모지 제거
-        String cleanedInput = nfcString.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]", "");
-        log.info("특수문자/공백 제거 완료: {}", cleanedInput);
-        
-        // 반복되는 문자열 축소
-        String normalized = cleanedInput.replaceAll("(.)\\1+", "$1");
-        log.info("반복 문자 축소 완료: {}", normalized);
+        // [Step 1] 문장 전체 정규화 및 정규식 검사
+        String normalizedSentence = cleanAndNormalize(input);
+        log.info("정규화 완료: {}", normalizedSentence);
 
-        // 정규화 패턴 매칭
-        var matcher = BAD_WORD_PATTERN.matcher(normalized);
+        var matcher = BAD_WORD_PATTERN.matcher(normalizedSentence);
         if (matcher.find()) {
             String detected = matcher.group();
             log.warn("정규식 매칭 감지: detected=[{}]", detected);
             return new CheckResult(true, "비속어가 감지되었습니다.", "Regex filter", 1.0, detected, "");
         }
 
-        // 단어 단위 1:1 매칭 검사
+        // [Step 2] 단어 단위 1:1 매칭 검사
         String[] words = input.split("\\s+");
         for (String word : words) {
-            String cleaned = word.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z]", "");
-            if (cleaned.isEmpty()) continue;
+            String nw = cleanAndNormalize(word);
+            if (nw.isEmpty()) continue;
 
-            String normalizedWord = cleaned.replaceAll("(.)\\1+", "$1");
-            if (badWordsSet.contains(normalizedWord)) {
-                log.warn("DB 1:1 매칭 감지: word=[{}]", normalizedWord);
+            if (badWordsSet.contains(nw)) {
+                log.warn("DB 1:1 매칭 감지: word=[{}]", nw);
                 return new CheckResult(true, "비속어가 감지되었습니다.", "1:1 데이터 매핑", 1.0, word, "");
             }
         }
 
-        // Fuzzy 매칭 검사
-        if (isBadWord(normalized)) {
-            log.warn("Fuzzy 매칭 감지: normalized=[{}]", normalized);
-            return new CheckResult(true, "비속어가 감지되었습니다.", "Fuzzy filter", 1.0, normalized, "");
+        // [Step 3] DB 기반 Fuzzy 매칭 검사
+        if (isBadWord(normalizedSentence)) {
+            log.warn("Fuzzy 매칭 감지: normalized=[{}]", normalizedSentence);
+            return new CheckResult(true, "비속어가 감지되었습니다.", "Fuzzy filter", 1.0, normalizedSentence, "");
         }
 
         // AI 기반(Vector/LLM) 검사 수행
@@ -154,8 +158,6 @@ public class BadWordPendingService {
         return llmResult;
     }
 
-
-
     /**
      *  자모분리
      **/
@@ -163,8 +165,6 @@ public class BadWordPendingService {
         // Normalizer.Form.NFD는 한글을 초/중/종성으로 분리하는 Java 표준 API입니다.
         return Normalizer.normalize(input, Normalizer.Form.NFD);
     }
-
-
 
     /**
      *  자모분리 실제 적용
@@ -220,12 +220,10 @@ public class BadWordPendingService {
         return false;
     }
 
-
-
     /**
-     *  LLM 조회 전 RAG를 통과한 문장 적재
+     * LLM 조회 전 RAG를 통과한 문장 적재
      **/
-    public CheckResult savePendingWord(String userInput, CheckResult checkResult) {
+    public void savePendingWord(String userInput, CheckResult checkResult) {
         try {
 
             pendingBadWordRepository.upsertPendingWord(
@@ -238,9 +236,7 @@ public class BadWordPendingService {
         } catch (Exception e) {
             log.error("Failed to save pending bad word: {}", e.getMessage());
         }
-        return checkResult;
     }
-
 
     /**
      *  LLM 조회 후 결과 업데이트

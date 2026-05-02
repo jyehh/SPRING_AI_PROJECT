@@ -32,7 +32,7 @@ public class AIController {
 
 
     // 1. 입력값 embedding 저장
-    @PostMapping("/check")
+    @PostMapping("/check/v1")
     public ResponseEntity<CheckResult> checkWord(@RequestBody Map<String, String> request) {
       String sentence = request.get("sentence");
 
