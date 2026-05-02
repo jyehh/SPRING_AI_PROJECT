@@ -24,7 +24,7 @@ public class BadWordSelectService {
     public CheckResult checkBadWordV2(String userInput) {
         log.info("사용자 입력 문장 : {}", userInput);
         // 1. VectorStore를 사용한 유사도 검색 (Spring AI 라이브러리 활용)
-        // 가장 유사한 1개의 문장을 찾습니다. (Top-K = 1)
+        // 가장 유사한 5개의 문장을 찾습니다. (Top-K = 5)
         List<Document> results = badWordValidService.selectVector(userInput);
 
         // 2. 만약 조회데이터가 없으면

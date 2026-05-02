@@ -93,24 +93,31 @@ public class BadWordValidService {
     public CheckResult askLLM(String userInput, Object contextLog) {
         log.info("LLM 판별 요청 중: [{}]", userInput);
         
-        LlmCheckResponse response = chatClient.prompt()
-                .user(userInput)
-                .call()
-                .entity(LlmCheckResponse.class);
+        try {
+            // ChatClientConfig에서 설정된 defaultSystem 프롬프트와 format이 자동으로 적용됩니다.
+            LlmCheckResponse response = chatClient.prompt()
+                    .user(userInput)
+                    .call()
+                    .entity(LlmCheckResponse.class);
 
-        if (response == null) {
-            return new CheckResult(false, "LLM 응답 없음", "ERROR", 0.0, null, contextLog);
+            if (response == null) {
+                log.warn("LLM 응답이 null입니다.");
+                return new CheckResult(false, "LLM 응답 없음", "ERROR", 0.0, null, contextLog);
+            }
+
+            log.info("LLM 판별 결과: {} ({}) - 사유: {}", response.isBad() ? "비속어" : "정상", response.category(), response.reason());
+
+            return new CheckResult(
+                    response.isBad(),
+                    response.isBad() ? "LLM에 의해 비속어가 감지되었습니다." : "안전한 문장입니다.",
+                    response.category(),
+                    0.0,
+                    null,
+                    contextLog
+            );
+        } catch (Exception e) {
+            log.error("LLM 판별 중 예외 발생: {}", e.getMessage(), e);
+            return new CheckResult(false, "LLM 서비스 일시적 오류", "ERROR", 0.0, null, contextLog);
         }
-
-        log.info("LLM 판별 결과: {} ({}) - 사유: {}", response.isBad() ? "비속어" : "정상", response.category(), response.reason());
-
-        return new CheckResult(
-                response.isBad(),
-                response.isBad() ? "LLM에 의해 비속어가 감지되었습니다." : "안전한 문장입니다.",
-                response.category(),
-                0.0,
-                null,
-                contextLog
-        );
     }
 }

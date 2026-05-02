@@ -26,7 +26,7 @@ public class BadWordSaveService {
     public void saveBadWord(String sentence) {
         log.info("비속어 등록 요청: {}", sentence);
 
-        // 1. 문장 내용을 기반으로 결정적 ID 생성 (중복 방지 핵심)
+        // 1. 문장 내용을 기반으로 ID 생성 (중복 방지 핵심)
         String deterministicId = UUID.nameUUIDFromBytes(sentence.getBytes(StandardCharsets.UTF_8)).toString();
         log.info("생성된 UUID: {}", deterministicId);
 
