@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.config.BadWordJsonDataInitializer;
 import com.example.demo.dto.CheckResult;
 import com.example.demo.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,10 +25,21 @@ public class AIController {
   private BadWordSendService badWordSendService;
   @Autowired
   private BadWordPendingService badWordPendingService;
+  @Autowired
+  private BadWordJsonDataInitializer badWordJsonDataInitializer;
 
   @GetMapping("/healthcheck")
   public ResponseEntity<String> healthcheck() {
     return ResponseEntity.ok("200 OK");
+  }
+
+  /**
+   * JSON 데이터를 비동기적으로 초기화하는 API
+   */
+  @PostMapping("/init-json")
+  public ResponseEntity<String> initJsonData() {
+    badWordJsonDataInitializer.initializeData();
+    return ResponseEntity.ok("JSON 데이터 초기화가 비동기적으로 시작되었습니다.");
   }
 
 

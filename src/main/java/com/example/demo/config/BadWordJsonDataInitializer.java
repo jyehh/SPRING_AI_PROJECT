@@ -11,11 +11,13 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -23,7 +25,7 @@ import java.util.stream.Collectors;
  * 문장 기반의 고정 ID를 생성하여 중복 저장을 방지(Upsert)합니다.
  */
 @Slf4j
-//@Component
+@Component
 @RequiredArgsConstructor
 public class BadWordJsonDataInitializer {
 
@@ -34,11 +36,11 @@ public class BadWordJsonDataInitializer {
     private record BadJsonData(String sentence, Map<String, Object> metadata) {}
 
     /**
-     * 애플리케이션 시작 시 실행되어 JSON 파일을 파싱하고 VectorStore에 데이터를 삽입합니다.
+     * JSON 파일을 파싱하고 VectorStore에 데이터를 삽입하는 비동기 메서드입니다.
      */
-    @PostConstruct
-    public void init() {
-        log.info("==== [JSON 데이터 초기화] 시작 ====");
+    @Async
+    public CompletableFuture<Void> initializeData() {
+        log.info("==== [JSON 데이터 비동기 초기화] 시작 ====");
 
         try {
             // 1. JSON 파일 읽기 (classpath:json/ 폴더 내의 특정 패턴 파일을 로드하여 파싱)
@@ -47,18 +49,18 @@ public class BadWordJsonDataInitializer {
 
             if (totalSize == 0) {
                 log.warn("처리할 JSON 데이터가 없습니다.");
-                return;
+                return CompletableFuture.completedFuture(null);
             }
 
             log.info("총 {}건의 JSON 문장을 로드했습니다. VectorStore 입력을 시작합니다.", totalSize);
 
             // 2. 배치(Batch) 처리 설정: 속도 최적화를 위해 500건 단위로 상향
             int batchSize = 500;
-            int startIndex = 0; // 36227번째부터 시작 (0-based index)
+            int startIndex = 0; 
 
             if (startIndex >= totalSize) {
                 log.warn("시작 인덱스({})가 전체 데이터 크기({})보다 큽니다.", startIndex + 1, totalSize);
-                return;
+                return CompletableFuture.completedFuture(null);
             }
 
             for (int i = startIndex; i < totalSize; i += batchSize) {
@@ -93,16 +95,17 @@ public class BadWordJsonDataInitializer {
 
                 // 실시간 진행률 및 소요 시간 로그 출력
                 double progress = ((double) endIndex / totalSize) * 100;
-                log.info("[JSON 진행] {}/{}건 ({}) | 변환: {}ms, 저장: {}ms | 시각: {}",
+                log.info("[JSON 비동기 진행] {}/{}건 ({}) | 변환: {}ms, 저장: {}ms | 시각: {}",
                          endIndex, totalSize, String.format("%.2f%%", progress),
                          (convTime - startTime), (saveTime - convTime), LocalDateTime.now());
             }
 
-            log.info("==== [JSON 데이터 초기화] 모든 작업이 완료되었습니다! ====");
+            log.info("==== [JSON 데이터 비동기 초기화] 모든 작업이 완료되었습니다! ====");
 
         } catch (Exception e) {
-            log.error("==== [JSON 데이터 초기화] 중단됨: {} ====", e.getMessage(), e);
+            log.error("==== [JSON 데이터 비동기 초기화] 중단됨: {} ====", e.getMessage(), e);
         }
+        return CompletableFuture.completedFuture(null);
     }
 
     /**

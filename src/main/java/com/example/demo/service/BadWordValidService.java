@@ -60,7 +60,7 @@ public class BadWordValidService {
         ResultItem top1 = items.get(0);
 
         // 최종 비속어 여부 판별: 
-        // - 유사도가 임계치 이상
+        // - 유사도가 임계치 이상 (0.80)
         // - 타입이 '정상(IMMORAL_NONE)'이 아님
         boolean isBad = top1.score() >= filterProperties.getRag().getSimilarityThreshold() && !top1.type().contains("IMMORAL_NONE");
 
