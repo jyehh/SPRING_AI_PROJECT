@@ -17,12 +17,12 @@ public class ChatClientConfig {
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder){
-        var converter = new BeanOutputConverter<>(LlmCheckResponse.class);
-        
+//        var converter = new BeanOutputConverter<>(LlmCheckResponse.class);
+
         return builder
                 .defaultAdvisors(new SimpleLoggerAdvisor())
-                .defaultSystem(s -> s.text(systemPromptResource)
-                        .param("format", converter.getFormat()))
+                .defaultSystem(s -> s.text(systemPromptResource))
+//                        .param("format", converter.getFormat()))
                 .build();
     }
 }

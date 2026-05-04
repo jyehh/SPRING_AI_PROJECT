@@ -34,9 +34,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'org.postgresql:postgresql'
 
-//    // pgvector Java 클라이언트
-//    implementation 'com.pgvector:pgvector:0.1.5'
-
     // [Spring AI]
     // Ollama 지원
     implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter'
@@ -45,7 +42,7 @@ dependencies {
 
     // [Utilities]
     // Fuzzy matching (Jaro-Winkler 유사도 계산용)
-    implementation 'org.apache.commons:commons-text:1.10.0'
+    implementation 'org.apache.commons:commons-text:1.11.0'
 
     // [Test]
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
