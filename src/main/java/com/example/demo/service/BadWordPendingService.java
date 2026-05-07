@@ -109,7 +109,7 @@ public class BadWordPendingService {
             //group : 실제로 어떤 단어를 찾았는지 확인
             String detected = matcher.group();
             log.warn("정규식 매칭 감지: detected=[{}]", detected);
-            return new CheckResult(true, "비속어가 감지되었습니다.", "Regex filter", 1.0, detected, "");
+            return CheckResult.detected("Regex filter", 1.0, detected, "");
         }
 
         // [Step 2] 단어 단위 1:1 매칭 검사
@@ -120,14 +120,14 @@ public class BadWordPendingService {
 
             if (badWordsSet.contains(nw)) {
                 log.warn("DB 1:1 매칭 감지: word=[{}]", nw);
-                return new CheckResult(true, "비속어가 감지되었습니다.", "1:1 데이터 매핑", 1.0, word, "");
+                return CheckResult.detected("1:1 데이터 매핑", 1.0, word, "");
             }
         }
 
         // [Step 3] DB 기반 Fuzzy 매칭 검사
         if (isBadWord(normalizedSentence)) {
             log.warn("Fuzzy 매칭 감지: normalized=[{}]", normalizedSentence);
-            return new CheckResult(true, "비속어가 감지되었습니다.", "Fuzzy filter", 1.0, normalizedSentence, "");
+            return CheckResult.detected("Fuzzy filter", 1.0, normalizedSentence, "");
         }
 
         // AI 기반(Vector/LLM) 검사 수행

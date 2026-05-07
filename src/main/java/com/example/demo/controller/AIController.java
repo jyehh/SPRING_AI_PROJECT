@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.BadWordJsonDataInitializer;
+import com.example.demo.dto.CheckRequest;
 import com.example.demo.dto.CheckResult;
 import com.example.demo.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,60 +46,50 @@ public class AIController {
 
     // 1. 입력값 embedding 저장
     @PostMapping("/check/v1")
-    public ResponseEntity<CheckResult> checkWord(@RequestBody Map<String, String> request) {
-      String sentence = request.get("sentence");
-
-      if (sentence == null || sentence.trim().isEmpty()) {
-        return ResponseEntity.badRequest().build();
-      }
+    public ResponseEntity<CheckResult> checkWord(@RequestBody CheckRequest request) {
+      validateRequest(request);
 
       try {
-        badWordSaveService.saveBadWord(sentence);
-        return ResponseEntity.ok(new CheckResult(false, "성공적으로 등록되었습니다.", "IMMORAL_BAD", 1.0, null,null));
+        badWordSaveService.saveBadWord(request.sentence());
+        return ResponseEntity.ok(CheckResult.safe());
       } catch (Exception e) {
-        return ResponseEntity.internalServerError().body(new CheckResult(true, "에러 발생: " + e.getMessage(), "ERROR", 0.0, null,null));
+        return ResponseEntity.internalServerError().body(CheckResult.error(e.getMessage()));
       }
     }
 
   // 2.입력문장 RAG 조회
     @PostMapping("/check/v2")
-    public ResponseEntity<CheckResult> checkWordv2(@RequestBody Map<String, String> request){
-      String sentence = request.get("sentence");
+    public ResponseEntity<CheckResult> checkWordv2(@RequestBody CheckRequest request){
+      validateRequest(request);
 
-      if (sentence == null || sentence.trim().isEmpty()) {
-        return ResponseEntity.badRequest().build();
-      }
-
-      CheckResult result = badWordService.checkBadWordV2(sentence);
+      CheckResult result = badWordService.checkBadWordV2(request.sentence());
       return ResponseEntity.ok(result);
     }
 
     // 3. 입력값 RAG 조회 후 pass 하면 LLM 호출
     @PostMapping("/check/v3")
-    public ResponseEntity<CheckResult> checkWordv3(@RequestBody Map<String, String> request){
-      String sentence = request.get("sentence");
+    public ResponseEntity<CheckResult> checkWordv3(@RequestBody CheckRequest request){
+      validateRequest(request);
 
-      if (sentence == null || sentence.trim().isEmpty()) {
-        return ResponseEntity.badRequest().build();
-      }
-
-      CheckResult result = badWordSendService.checkBadWordV3(sentence);
+      CheckResult result = badWordSendService.checkBadWordV3(request.sentence());
 
       return ResponseEntity.ok(result);
     }
 
   // 전처리작업 이후 RAG 조회 -> LLM 호출
     @PostMapping("/check/v4")
-    public ResponseEntity<CheckResult> checkWordv4(@RequestBody Map<String, String> request){
-      String sentence = request.get("sentence");
+    public ResponseEntity<CheckResult> checkWordv4(@RequestBody CheckRequest request){
+      validateRequest(request);
 
-      if (sentence == null || sentence.trim().isEmpty()) {
-        return ResponseEntity.badRequest().build();
-      }
-
-      CheckResult result = badWordPendingService.checkBadWordV4(sentence);
+      CheckResult result = badWordPendingService.checkBadWordV4(request.sentence());
 
       return ResponseEntity.ok(result);
+    }
+
+    private void validateRequest(CheckRequest request) {
+        if (request == null || request.sentence() == null || request.sentence().trim().isEmpty()) {
+            throw new IllegalArgumentException("입력 문장은 필수입니다.");
+        }
     }
 
 }

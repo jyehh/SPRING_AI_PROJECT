@@ -28,14 +28,14 @@ public class BadWordValidService {
      * 유사도가 하한선 미만인 데이터는 노이즈로 간주하여 제외합니다.
      */
     public List<Document> selectVector(String userInput) {
-//        return vectorStore.similaritySearch(userInput);
-        return vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(userInput)
-                        .topK(filterProperties.getRag().getTopK())
-                        .similarityThreshold(filterProperties.getRag().getMinSimilarity())
-                        .build()
-        );
+        return vectorStore.similaritySearch(userInput);
+//        return vectorStore.similaritySearch(
+//                SearchRequest.builder()
+//                        .query(userInput)
+//                        .topK(filterProperties.getRag().getTopK())
+//                        .similarityThreshold(filterProperties.getRag().getMinSimilarity())
+//                        .build()
+//        );
     }
 
     /**
@@ -44,7 +44,7 @@ public class BadWordValidService {
      */
     public CheckResult checkResult(List<Document> results) {
         if (results == null || results.isEmpty()) {
-            return new CheckResult(false, "검색 결과가 없습니다.", "N/A", 0.0, null, null);
+            return CheckResult.safe();
         }
 
         // 1. 검색 결과를 ResultItem 리스트로 변환 (응답 로그용)
@@ -61,22 +61,18 @@ public class BadWordValidService {
         ResultItem top1 = items.get(0);
 
         // 최종 비속어 여부 판별: 
-        // - 유사도가 임계치 이상 (0.80)
+        // - 유사도가 임계치 이상
         // - 타입이 '정상(IMMORAL_NONE)'이 아님
         boolean isBad = top1.score() >= filterProperties.getRag().getSimilarityThreshold() && !top1.type().contains("IMMORAL_NONE");
 
-        log.info("RAG 판별 완료 (Top 1 기준) - 판별문장 :{} 유사도: {}, 타입: {}, 판별: {}",
-               top1.text(), String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
+        log.info("RAG 판별 완료 (Top 1 기준) - 유사도: {}, 타입: {}, 판별: {}", 
+                String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
 
-        return new CheckResult(
-                isBad,
-                isBad ? "비속어가 감지되었습니다." : "안전한 문장입니다.",
-                top1.type(),
-                top1.score(),
-                top1.text(),
-                items // 5개 전체 데이터를 allItemsLog에 담아 반환
-        );
+        return isBad 
+            ? CheckResult.detected(top1.type(), top1.score(), top1.text(), items)
+            : CheckResult.safe();
     }
+
 
     /**
      * 메타데이터 객체를 문자열 형식으로 정제합니다.
@@ -103,22 +99,15 @@ public class BadWordValidService {
 
             if (response == null) {
                 log.warn("LLM 응답이 null입니다.");
-                return new CheckResult(false, "LLM 응답 없음", "ERROR", 0.0, null, contextLog);
+                return CheckResult.error("LLM 응답 없음");
             }
 
             log.info("LLM 판별 결과: {} ({}) - 사유: {}", response.isBad() ? "비속어" : "정상", response.category(), response.reason());
 
-            return new CheckResult(
-                    response.isBad(),
-                    response.isBad() ? "LLM에 의해 비속어가 감지되었습니다." : "안전한 문장입니다.",
-                    response.category(),
-                    0.0,
-                    null,
-                    contextLog
-            );
+            return CheckResult.llm(response.isBad(), response.category(), contextLog);
         } catch (Exception e) {
             log.error("LLM 판별 중 예외 발생: {}", e.getMessage(), e);
-            return new CheckResult(false, "LLM 서비스 일시적 오류", "ERROR", 0.0, null, contextLog);
+            return CheckResult.error("LLM 서비스 일시적 오류");
         }
     }
 }
