@@ -28,6 +28,7 @@ public class BadWordValidService {
      * 유사도가 하한선 미만인 데이터는 노이즈로 간주하여 제외합니다.
      */
     public List<Document> selectVector(String userInput) {
+//        return vectorStore.similaritySearch(userInput);
         return vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(userInput)
@@ -64,8 +65,8 @@ public class BadWordValidService {
         // - 타입이 '정상(IMMORAL_NONE)'이 아님
         boolean isBad = top1.score() >= filterProperties.getRag().getSimilarityThreshold() && !top1.type().contains("IMMORAL_NONE");
 
-        log.info("RAG 판별 완료 (Top 1 기준) - 유사도: {}, 타입: {}, 판별: {}", 
-                String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
+        log.info("RAG 판별 완료 (Top 1 기준) - 판별문장 :{} 유사도: {}, 타입: {}, 판별: {}",
+               top1.text(), String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
 
         return new CheckResult(
                 isBad,

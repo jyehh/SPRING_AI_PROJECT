@@ -27,7 +27,7 @@ public class BadWordFilterProperties {
     @Data
     public static class Rag {
         private double minSimilarity = 0.75;
-        private double similarityThreshold = 0.83;
+        private double similarityThreshold = 0.80;
         private int topK = 5;
     }
 
