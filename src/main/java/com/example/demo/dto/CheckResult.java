@@ -14,8 +14,9 @@ public record CheckResult(
     }
 
     // 2. 비속어가 감지되었을 때
-    public static CheckResult detected(String type, double score, String word, Object details) {
-        return new CheckResult(true, "비속어가 감지되었습니다.", type, score, word, details);
+    public static CheckResult detected(boolean isBad,  String type, double score, String word, Object details) {
+        String msg = isBad ? "비속어가 감지되었습니다." : "안전한 문장입니다.";
+        return new CheckResult(true, msg, type, score, word, details);
     }
 
     // 3. 에러가 발생했을 때
@@ -27,5 +28,10 @@ public record CheckResult(
     public static CheckResult llm(boolean isBad, String category, Object details) {
         String msg = isBad ? "LLM에 의해 비속어가 감지되었습니다." : "안전한 문장입니다.";
         return new CheckResult(isBad, msg, category, 0.0, null, details);
+    }
+
+    // 2. 비속어 적재
+    public static CheckResult save() {
+        return new CheckResult(true, "비속어가 등록되었습니다.", "IMMORAL_BAD", 0.0, null, null);
     }
 }

@@ -51,7 +51,7 @@ public class AIController {
 
       try {
         badWordSaveService.saveBadWord(request.sentence());
-        return ResponseEntity.ok(CheckResult.safe());
+        return ResponseEntity.ok(CheckResult.save());
       } catch (Exception e) {
         return ResponseEntity.internalServerError().body(CheckResult.error(e.getMessage()));
       }

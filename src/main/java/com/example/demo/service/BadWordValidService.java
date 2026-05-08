@@ -68,9 +68,7 @@ public class BadWordValidService {
         log.info("RAG 판별 완료 (Top 1 기준) - 유사도: {}, 타입: {}, 판별: {}", 
                 String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
 
-        return isBad 
-            ? CheckResult.detected(top1.type(), top1.score(), top1.text(), items)
-            : CheckResult.safe();
+        return CheckResult.detected(isBad,top1.type(), top1.score(), top1.text(), items);
     }
 
 
