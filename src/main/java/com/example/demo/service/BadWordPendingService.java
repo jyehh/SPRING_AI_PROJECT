@@ -37,6 +37,7 @@ public class BadWordPendingService {
 
     // 1:1 매칭용 셋 (조회 성능 O(1))
     private Set<String> badWordsSet = new HashSet<>();
+
     // Fuzzy 매칭용 리스트 (미리 계산된 데이터로 순회 성능 최적화)
     private List<BadWordCache> badWordCacheList = new ArrayList<>();
 
@@ -75,14 +76,14 @@ public class BadWordPendingService {
             tempCache.add(new BadWordCache(word, decomposed, decomposed.length()));
         }
 
-        //Collections.unmodifiable : readOnly
+        //Collections.unmodifiable : readOnly ( 해당 collection 수정 삭제 불가능 )
         this.badWordsSet = Collections.unmodifiableSet(words);
         this.badWordCacheList = Collections.unmodifiableList(tempCache);
         log.info("DB 비속어 캐시 로드 완료: {}건", badWordCacheList.size());
     }
 
     /**
-     * 문자열을 전처리하고 정규화합니다. (NFC 정규화 + 특수문자 제거 + 반복문자 축소)
+     * 문자열을 전처리하고 정규화합니다. (NFC 정규화 + 특수문자 제거 + 반복문자 제거)
      */
     private String cleanAndNormalize(String input) {
         if (input == null || input.trim().isEmpty()) return "";
@@ -93,14 +94,14 @@ public class BadWordPendingService {
         // 2. 특수문자, 공백, 이모지 제거 (한글, 영문, 숫자만 유지)
         String cleaned = nfc.replaceAll("[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]", "");
         
-        // 3. 반복되는 문자열 축소 (예: "바보보보" -> "바보")
+        // 3. 반복되는 문자열 제거 (예: "바보보보" -> "바보")
         return cleaned.replaceAll("(.)\\1+", "$1");
     }
 
     public CheckResult checkBadWordV4(String input) {
         log.info("입력문장: {}", input);
 
-        // [Step 1] 문장 전체 정규화 및 정규식 검사
+        // 1. 문장 전체 정규화 및 정규식 검사
         String normalizedSentence = cleanAndNormalize(input);
         log.info("정규화 완료: {}", normalizedSentence);
 
@@ -112,7 +113,7 @@ public class BadWordPendingService {
             return CheckResult.detected(true,"Regex filter", 1.0, detected, "");
         }
 
-        // [Step 2] 단어 단위 1:1 매칭 검사
+        // 2. 단어 단위 1:1 매칭 검사
         String[] words = input.split("\\s+");
         for (String word : words) {
             String nw = cleanAndNormalize(word);
@@ -124,13 +125,13 @@ public class BadWordPendingService {
             }
         }
 
-        // [Step 3] DB 기반 Fuzzy 매칭 검사
+        // 3. DB 기반 Fuzzy 매칭 검사
         if (isBadWord(normalizedSentence)) {
             log.warn("Fuzzy 매칭 감지: normalized=[{}]", normalizedSentence);
             return CheckResult.detected(true,"Fuzzy filter", 1.0, normalizedSentence, "");
         }
 
-        // AI 기반(Vector/LLM) 검사 수행
+        // 4. AI 기반(Vector/LLM) 검사 수행
         log.info("로컬 필터 통과. AI 기반(RAG/LLM) 정밀 검사 수행");
         return isChecked(input);
     }
@@ -151,7 +152,7 @@ public class BadWordPendingService {
         }
 
         // 3. RAG 결과 분석
-        log.info("RAG 결과 분석 중...");
+        log.info("RAG 결과 분석 시작...");
         CheckResult checkResult = badWordValidService.checkResult(results);
 
         // 4. RAG 결과가 비속어인 경우 즉시 반환
@@ -163,16 +164,16 @@ public class BadWordPendingService {
         // 5. RAG 결과가 정상이지만, 확실히 하기 위해 LLM 2차 검증 수행
         log.info("RAG 판별 결과: 정상 -> LLM 정밀 재검증 수행");
         
-        // 대기 데이터 적재 (사후 모니터링용)
+        // 6. 대기 데이터 적재 (사후 모니터링용)
         savePendingWord(userInput, checkResult);
         
-        // LLM 호출
+        // 7. LLM 호출
         CheckResult llmResult = badWordValidService.askLLM(userInput, checkResult.allItemsLog());
         
-        // 대기 데이터 업데이트
+        // 8. 대기 데이터 업데이트
         updatePendingWord(String.valueOf(llmResult.isBad()), userInput);
 
-        // LLM 검증 결과 비속어인 경우 Vector DB에 학습 데이터로 자동 저장
+        // 9. LLM 검증 결과 비속어인 경우 Vector DB에 학습 데이터로 자동 저장
         if (llmResult.isBad()) {
             log.info("LLM 재검증 결과: 비속어 확정 -> 자동 학습 데이터(Vector DB) 적재");
             badWordSaveService.saveBadWord(userInput);
@@ -183,9 +184,9 @@ public class BadWordPendingService {
 
     /**
      *  자모분리
+     *  Normalizer.Form.NFD는 한글을 초/중/종성으로 분리하는 Java 표준 API
      **/
     public static String decompose(String input) {
-        // Normalizer.Form.NFD는 한글을 초/중/종성으로 분리하는 Java 표준 API입니다.
         return Normalizer.normalize(input, Normalizer.Form.NFD);
     }
 
@@ -226,7 +227,7 @@ public class BadWordPendingService {
                 }
 
                 // 자모 분리 +  Fuzzy 검사
-                // 자모분리 된 입력값 보다 자모분리 된 비속어 길이 짧으면 pass
+                // 자모분리 된 입력값 보다 자모분리 된 비속어 길이가 짧으면 pass
                 if (inputLen < badLen) continue;
 
                 // 슬라이딩 윈도우 기법
@@ -245,6 +246,7 @@ public class BadWordPendingService {
 
     /**
      * LLM 조회 전 RAG를 통과한 문장 적재
+     * pending_bad_word 테이블에 pending_word 값으로 조회 가능
      **/
     public void savePendingWord(String userInput, CheckResult checkResult) {
         try {
@@ -263,6 +265,7 @@ public class BadWordPendingService {
 
     /**
      *  LLM 조회 후 결과 업데이트
+     *  pending_bad_word 테이블에 response 값 업데이트 확인
      **/
     public void updatePendingWord(String response,String pendingBadWord){
         pendingBadWordRepository.updatePendingWord(response,pendingBadWord);

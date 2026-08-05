@@ -25,17 +25,16 @@ public class BadWordValidService {
 
     /**
      * VectorStore에서 가장 유사한 상위 데이터를 검색합니다.
-     * 유사도가 하한선 미만인 데이터는 노이즈로 간주하여 제외합니다.
      */
     public List<Document> selectVector(String userInput) {
-        return vectorStore.similaritySearch(userInput);
-//        return vectorStore.similaritySearch(
-//                SearchRequest.builder()
-//                        .query(userInput)
-//                        .topK(filterProperties.getRag().getTopK())
+//        return vectorStore.similaritySearch(userInput);
+        return vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(userInput)
+                        .topK(filterProperties.getRag().getTopK())
 //                        .similarityThreshold(filterProperties.getRag().getMinSimilarity())
-//                        .build()
-//        );
+                        .build()
+        );
     }
 
     /**
@@ -57,7 +56,7 @@ public class BadWordValidService {
             return new ResultItem(score, text, type);
         }).toList();
 
-        // 2. 판정은 가장 유사도가 높은 첫 번째 데이터(Top 1)만 사용
+        // 2. 판정은 가장 유사도가 높은 첫 번째 데이터만 사용
         ResultItem top1 = items.get(0);
 
         // 최종 비속어 여부 판별: 
@@ -65,7 +64,7 @@ public class BadWordValidService {
         // - 타입이 '정상(IMMORAL_NONE)'이 아님
         boolean isBad = top1.score() >= filterProperties.getRag().getSimilarityThreshold() && !top1.type().contains("IMMORAL_NONE");
 
-        log.info("RAG 판별 완료 (Top 1 기준) - 유사도: {}, 타입: {}, 판별: {}", 
+        log.info("RAG 판별 완료 - 유사도: {}, 타입: {}, 판별: {}",
                 String.format("%.4f", top1.score()), top1.type(), isBad ? "비속어" : "정상");
 
         return CheckResult.detected(isBad,top1.type(), top1.score(), top1.text(), items);
@@ -83,7 +82,7 @@ public class BadWordValidService {
     }
 
     /**
-     * LLM에게 직접 비속어 여부를 물어봅니다.
+     * LLM으로 비속어 여부를 판단합니다.
      */
     public CheckResult askLLM(String userInput, Object contextLog) {
         log.info("LLM 판별 요청 중: [{}]", userInput);

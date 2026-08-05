@@ -16,7 +16,7 @@ public record CheckResult(
     // 2. 비속어가 감지되었을 때
     public static CheckResult detected(boolean isBad,  String type, double score, String word, Object details) {
         String msg = isBad ? "비속어가 감지되었습니다." : "안전한 문장입니다.";
-        return new CheckResult(true, msg, type, score, word, details);
+        return new CheckResult(isBad, msg, type, score, word, details);
     }
 
     // 3. 에러가 발생했을 때

@@ -37,14 +37,16 @@ public class AIController {
   /**
    * JSON 데이터를 비동기적으로 초기화하는 API
    */
-  @PostMapping("/init-json")
+  @GetMapping("/init-json")
   public ResponseEntity<String> initJsonData() {
     badWordJsonDataInitializer.initializeData();
     return ResponseEntity.ok("JSON 데이터 초기화가 비동기적으로 시작되었습니다.");
   }
 
 
-    // 1. 입력값 embedding 저장
+  /**
+   * 1. 입력값 embedding 저장
+   */
     @PostMapping("/check/v1")
     public ResponseEntity<CheckResult> checkWord(@RequestBody CheckRequest request) {
       validateRequest(request);
@@ -57,7 +59,9 @@ public class AIController {
       }
     }
 
-  // 2.입력문장 RAG 조회
+  /**
+   * 2.입력문장 RAG 조회
+   */
     @PostMapping("/check/v2")
     public ResponseEntity<CheckResult> checkWordv2(@RequestBody CheckRequest request){
       validateRequest(request);
@@ -66,7 +70,9 @@ public class AIController {
       return ResponseEntity.ok(result);
     }
 
-    // 3. 입력값 RAG 조회 후 pass 하면 LLM 호출
+  /**
+   * 3. 입력값 RAG 조회 후 pass 하면 LLM 호출
+   */
     @PostMapping("/check/v3")
     public ResponseEntity<CheckResult> checkWordv3(@RequestBody CheckRequest request){
       validateRequest(request);
@@ -76,7 +82,9 @@ public class AIController {
       return ResponseEntity.ok(result);
     }
 
-  // 전처리작업 이후 RAG 조회 -> LLM 호출
+  /**
+   * 전처리작업 이후 RAG 조회 -> LLM 호출 -> 비속어 이면 vector_store에 저장 / 비속어가 아니면 pass
+   */
     @PostMapping("/check/v4")
     public ResponseEntity<CheckResult> checkWordv4(@RequestBody CheckRequest request){
       validateRequest(request);

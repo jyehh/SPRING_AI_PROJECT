@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.scheduling.annotation.Async;
@@ -55,7 +56,7 @@ public class BadWordJsonDataInitializer {
             log.info("총 {}건의 JSON 문장을 로드했습니다. VectorStore 입력을 시작합니다.", totalSize);
 
             // 2. 배치(Batch) 처리 설정: 속도 최적화를 위해 500건 단위로 상향
-            int batchSize = 500;
+            int batchSize = 100;
             int startIndex = 0; 
 
             if (startIndex >= totalSize) {
@@ -114,7 +115,7 @@ public class BadWordJsonDataInitializer {
     private List<BadJsonData> readAllJsonFiles() throws Exception {
         List<BadJsonData> results = new ArrayList<>();
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        Resource[] resources = resolver.getResources("classpath:json/bad_sentences_*.json");
+        Resource[] resources = resolver.getResources("classpath:json/bad_sentences_1.json");
 
         // ObjectMapper 설정: null 필드는 제외하도록 구성하여 Map 변환 시 null 값이 들어가지 않게 함
         // (이미 생성된 Bean에 영향을 주지 않기 위해 copy() 사용 고려 가능하나, 
