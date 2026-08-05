@@ -7,7 +7,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -20,8 +22,7 @@ import java.util.List;
  * 마크다운 파일(.md) 형식의 비속어 단어 리스트를 읽어 RDB(bad_word 테이블)에 저장하는 초기화 클래스입니다.
  */
 @Slf4j
-//@Order(2)
-//@Component
+@Component
 @RequiredArgsConstructor
 public class BadWordMdRDBDataInitializer {
 
@@ -30,7 +31,8 @@ public class BadWordMdRDBDataInitializer {
     /**
      * 애플리케이션 시작 시 실행되어 MD 파일을 읽고 DB(bad_word 테이블)에 데이터를 삽입합니다.
      */
-    @PostConstruct
+
+    @Async
     public void init() {
         log.info("==== [MD RDB 데이터 초기화] 시작 ====");
 

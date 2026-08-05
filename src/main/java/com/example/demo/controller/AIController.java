@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.config.BadWordJsonDataInitializer;
+import com.example.demo.config.BadWordMdRDBDataInitializer;
 import com.example.demo.dto.CheckRequest;
 import com.example.demo.dto.CheckResult;
 import com.example.demo.service.*;
@@ -28,11 +29,23 @@ public class AIController {
   private BadWordPendingService badWordPendingService;
   @Autowired
   private BadWordJsonDataInitializer badWordJsonDataInitializer;
+  @Autowired
+  private BadWordMdRDBDataInitializer badWordMdRDBDataInitializer;
 
   @GetMapping("/healthcheck")
   public ResponseEntity<String> healthcheck() {
     return ResponseEntity.ok("200 OK");
   }
+
+  /**
+   * MD 파일의 비속어 데이터 RDB 등록을 실행
+   */
+  @GetMapping("/init-bad-words")
+  public ResponseEntity<String> initBadWords() {
+    badWordMdRDBDataInitializer.init();
+    return ResponseEntity.ok("MD 비속어 데이터를 RDB에 반영을 시작합니다.");
+  }
+
 
   /**
    * JSON 데이터를 비동기적으로 초기화하는 API
@@ -42,7 +55,6 @@ public class AIController {
     badWordJsonDataInitializer.initializeData();
     return ResponseEntity.ok("JSON 데이터 초기화가 비동기적으로 시작되었습니다.");
   }
-
 
   /**
    * 1. 입력값 embedding 저장
